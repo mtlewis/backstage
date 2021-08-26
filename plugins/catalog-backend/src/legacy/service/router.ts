@@ -47,8 +47,10 @@ import {
   requireRequestBody,
   validateRequestBody,
 } from '../../service/util';
-import { AuthorizeResult } from '@backstage/plugin-permission';
-import { PermissionClient } from '@backstage/plugin-permission-module-catalog';
+import {
+  AuthorizeResult,
+  PermissionClient,
+} from '@backstage/permission-common';
 import { IdentityClient } from '@backstage/plugin-auth-backend';
 
 /** @deprecated This was part of the legacy catalog engine */
