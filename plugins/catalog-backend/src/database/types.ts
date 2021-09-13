@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { Filters } from '@backstage/backend-common';
 import type {
   Entity,
   EntityName,
@@ -37,7 +38,8 @@ export type DbEntityRequest = {
 };
 
 export type DbEntitiesRequest = {
-  filter?: EntityFilter;
+  filter?: Filters;
+  authorizationFilters?: Filters;
   pagination?: EntityPagination;
 };
 
@@ -97,42 +99,6 @@ export type DatabaseLocationUpdateLogEvent = {
   entity_name: string;
   created_at?: string;
   message?: string;
-};
-
-/**
- * Matches rows in the entities_search table.
- */
-export type EntitiesSearchFilter = {
-  /**
-   * The key to match on.
-   *
-   * Matches are always case insensitive.
-   */
-  key: string;
-
-  /**
-   * Match on plain equality of values.
-   *
-   * If undefined, this factor is not taken into account. Otherwise, match on
-   * values that are equal to any of the given array items. Matches are always
-   * case insensitive.
-   */
-  matchValueIn?: string[];
-
-  /**
-   * Match on existence of key.
-   */
-  matchValueExists?: boolean;
-};
-
-/**
- * A filter expression for entities.
- *
- * Any (at least one) of the outer sets must match, within which all of the
- * individual filters must match.
- */
-export type EntityFilter = {
-  anyOf: { allOf: EntitiesSearchFilter[] }[];
 };
 
 /**
