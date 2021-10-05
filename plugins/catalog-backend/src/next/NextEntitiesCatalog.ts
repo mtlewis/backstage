@@ -128,10 +128,11 @@ export class NextEntitiesCatalog implements EntitiesCatalog {
     let entitiesQuery = db<DbFinalEntitiesRow>('final_entities');
 
     const permission = CatalogPermission.ENTITY_READ;
-    const authorizationFilters = await this.permissionApi.authorizeFilters(
-      { permission },
-      { token: request?.authorizationToken },
-    );
+    const authorizationFilters = (
+      await this.permissionApi.authorize([{ permission }], {
+        token: request?.authorizationToken,
+      })
+    )[0];
 
     if (authorizationFilters.result === AuthorizeResult.DENY) {
       return {
