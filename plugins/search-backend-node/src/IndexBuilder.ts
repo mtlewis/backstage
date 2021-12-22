@@ -140,7 +140,11 @@ export class IndexBuilder {
         }
 
         // pushing documents to index to a configured search engine.
-        await this.searchEngine.index(type, documents);
+        await this.searchEngine.index(type, documents, {
+          permission: this.collators[type].collate.documentReadPermission(),
+          conditionTransformer:
+            this.collators[type].collate.createConditionTransformer(),
+        });
       }, this.collators[type].refreshInterval * 1000);
     });
 

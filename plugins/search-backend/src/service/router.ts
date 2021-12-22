@@ -19,6 +19,7 @@ import Router from 'express-promise-router';
 import { Logger } from 'winston';
 import { SearchQuery, SearchResultSet } from '@backstage/search-common';
 import { SearchEngine } from '@backstage/plugin-search-backend-node';
+import { IdentityClient } from '@backstage/plugin-auth-backend';
 
 export type RouterOptions = {
   engine: SearchEngine;
@@ -54,6 +55,8 @@ export async function createRouter(
       req: express.Request<any, unknown, unknown, SearchQuery>,
       res: express.Response<SearchResultSet>,
     ) => {
+      const token = IdentityClient.getBearerToken(req.header('authorization'));
+
       const { term, filters = {}, types, pageCursor } = req.query;
       logger.info(
         `Search request received: term="${term}", filters=${JSON.stringify(
@@ -64,7 +67,7 @@ export async function createRouter(
       );
 
       try {
-        const resultSet = await engine?.query(req.query);
+        const resultSet = await engine?.query(req.query, { token });
         res.send(filterResultSet(resultSet));
       } catch (err) {
         throw new Error(

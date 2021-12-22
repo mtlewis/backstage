@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import { Entity } from '@backstage/catalog-model';
+import { PermissionCriteria } from '@backstage/plugin-permission-common';
 import { EntitiesSearchFilter } from '../../catalog/types';
 
 export const isEntityKind = {
@@ -24,10 +25,14 @@ export const isEntityKind = {
       .map(kind => kind.toLocaleLowerCase('en-US'))
       .some(kind => kind === resource.kind.toLocaleLowerCase('en-US'));
   },
-  toQuery(kinds: string[]): EntitiesSearchFilter {
+  toQuery(kinds: string[]): PermissionCriteria<EntitiesSearchFilter> {
     return {
-      key: 'kind',
-      values: kinds.map(kind => kind.toLocaleLowerCase('en-US')),
+      anyOf: [
+        {
+          key: 'kind',
+          values: kinds.map(kind => kind.toLocaleLowerCase('en-US')),
+        },
+      ],
     };
   },
 };

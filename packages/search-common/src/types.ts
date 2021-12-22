@@ -13,7 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Permission } from '@backstage/plugin-permission-common';
+import {
+  Permission,
+  PermissionCondition,
+  PermissionCriteria,
+} from '@backstage/plugin-permission-common';
 import { JsonObject } from '@backstage/types';
 
 export interface SearchQuery {
@@ -25,7 +29,7 @@ export interface SearchQuery {
 
 export interface SearchResult {
   type: string;
-  document: IndexableDocument;
+  document: IndexableDocument<any>;
 }
 
 export interface SearchResultSet {
@@ -38,7 +42,7 @@ export interface SearchResultSet {
  * Base properties that all indexed documents must include, as well as some
  * common properties that documents are encouraged to use where appropriate.
  */
-export interface IndexableDocument {
+export interface IndexableDocument<T = unknown> {
   /**
    * The primary name of the document (e.g. name, title, identifier, etc).
    */
@@ -55,50 +59,45 @@ export interface IndexableDocument {
    */
   location: string;
 
-  /**
-   * Optional authorization information to be used when determining whether this
-   * search result should be visible to a given user.
-   */
-  authorization?: {
-    /**
-     * The permission to use to authorize access. Should generally be the same
-     * permission used to authorize access to the corresponding resource (e.g.
-     * for catalog entity documents, this should be the catalogEntityReadPermission).
-     */
-    permission: Permission;
-
-    /**
-     * Identifier for the resource.
-     */
-    resourceRef: string;
-  };
+  resource: T;
 }
 
 /**
  * Interface that must be implemented in order to expose new documents to
  * search.
  */
-export interface DocumentCollator {
+export interface DocumentCollator<
+  TDocument extends IndexableDocument<unknown> = IndexableDocument<unknown>,
+> {
   /**
    * The type or name of the document set returned by this collator. Used as an
    * index name by Search Engines.
    */
   readonly type: string;
-  execute(): Promise<IndexableDocument[]>;
+
+  documentReadPermission(): Permission;
+
+  createConditionTransformer(): (
+    conditions: PermissionCriteria<PermissionCondition>,
+  ) => object;
+
+  execute(): Promise<TDocument[]>;
 }
 
 /**
  * Interface that must be implemented in order to decorate existing documents with
  * additional metadata.
  */
-export interface DocumentDecorator {
+export interface DocumentDecorator<
+  TDocument extends IndexableDocument<unknown> = IndexableDocument<unknown>,
+> {
   /**
    * An optional array of document/index types on which this decorator should
    * be applied. If no types are provided, this decorator will be applied to
    * all document/index types.
    */
   readonly types?: string[];
-  execute(documents: IndexableDocument[]): Promise<IndexableDocument[]>;
+  execute(documents: TDocument[]): Promise<TDocument[]>;
 }
 
 /**
@@ -121,10 +120,22 @@ export interface SearchEngine {
   /**
    * Add the given documents to the SearchEngine index of the given type.
    */
-  index(type: string, documents: IndexableDocument[]): Promise<void>;
+  index(
+    type: string,
+    documents: IndexableDocument<any>[],
+    permissionInfo?: {
+      permission: Permission;
+      conditionTransformer: (
+        conditions: PermissionCriteria<PermissionCondition>,
+      ) => object;
+    },
+  ): Promise<void>;
 
   /**
    * Perform a search query against the SearchEngine.
    */
-  query(query: SearchQuery): Promise<SearchResultSet>;
+  query(
+    query: SearchQuery,
+    options?: { token?: string },
+  ): Promise<SearchResultSet>;
 }

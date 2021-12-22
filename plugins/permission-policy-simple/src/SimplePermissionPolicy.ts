@@ -55,13 +55,15 @@ export class SimplePermissionPolicy implements PermissionPolicy {
 
       const { identity } = user;
       if (request.permission.attributes.action === 'read') {
-        return createCatalogPolicyDecision({
-          anyOf: [
-            isEntityOwner(identity.ownershipEntityRefs),
-            isComponentType(['website']),
-            isEntityKind(['template']),
-          ],
-        });
+        return createCatalogPolicyDecision(
+          // {
+          // anyOf: [
+          isEntityOwner(identity.ownershipEntityRefs),
+        );
+        // isComponentType(['website']),
+        // isEntityKind(['template']),
+        // ],
+        //});
       }
 
       return createCatalogPolicyDecision(

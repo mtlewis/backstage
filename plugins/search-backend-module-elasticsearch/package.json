@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@backstage/config": "^0.1.8",
+    "@backstage/plugin-permission-common": "^0.2.0",
     "@backstage/search-common": "^0.2.0",
     "@elastic/elasticsearch": "7.13.0",
     "@acuris/aws-es-connection": "^2.2.0",

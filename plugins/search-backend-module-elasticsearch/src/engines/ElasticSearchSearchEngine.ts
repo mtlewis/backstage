@@ -19,6 +19,15 @@ import {
   createAWSConnection,
 } from '@acuris/aws-es-connection';
 import { Config } from '@backstage/config';
+import { EntitiesSearchFilter } from '@backstage/plugin-catalog-backend';
+import {
+  AuthorizeResponse,
+  AuthorizeResult,
+  Permission,
+  PermissionAuthorizer,
+  PermissionCondition,
+  PermissionCriteria,
+} from '@backstage/plugin-permission-common';
 import {
   IndexableDocument,
   SearchEngine,
@@ -47,6 +56,7 @@ type ElasticSearchQueryTranslator = (
 type ElasticSearchOptions = {
   logger: Logger;
   config: Config;
+  permissions: PermissionAuthorizer;
   aliasPostfix?: string;
   indexPrefix?: string;
 };
@@ -68,17 +78,67 @@ function isBlank(str: string) {
   return (isEmpty(str) && !isNumber(str)) || nan(str);
 }
 
+export const isAndCriteria = (
+  filter: PermissionCriteria<unknown>,
+): filter is { allOf: PermissionCriteria<unknown>[] } =>
+  Object.prototype.hasOwnProperty.call(filter, 'allOf');
+
+export const isOrCriteria = (
+  filter: PermissionCriteria<unknown>,
+): filter is { anyOf: PermissionCriteria<unknown>[] } =>
+  Object.prototype.hasOwnProperty.call(filter, 'anyOf');
+
+export const isNotCriteria = (
+  filter: PermissionCriteria<unknown>,
+): filter is { not: PermissionCriteria<unknown> } =>
+  Object.prototype.hasOwnProperty.call(filter, 'not');
+
+const convertToEsb = (
+  conditions: PermissionCriteria<EntitiesSearchFilter>,
+): esb.Query => {
+  if (isOrCriteria(conditions)) {
+    return esb
+      .boolQuery()
+      .should(conditions.anyOf.map(convertToEsb))
+      .minimumShouldMatch(1);
+  }
+
+  if (isAndCriteria(conditions)) {
+    return esb.boolQuery().filter(conditions.allOf.map(convertToEsb));
+  }
+
+  if (isNotCriteria(conditions)) {
+    return esb.boolQuery().mustNot(convertToEsb(conditions.not));
+  }
+
+  return esb.termsQuery(
+    `resource.${conditions.key.toLowerCase()}`,
+    conditions.values,
+  );
+};
+
 /**
  * @public
  */
 export class ElasticSearchSearchEngine implements SearchEngine {
   private readonly elasticSearchClient: Client;
+  private readonly permissionInfo: Record<
+    string,
+    | {
+        permission: Permission;
+        conditionTransformer: (
+          conditions: PermissionCriteria<PermissionCondition>,
+        ) => object;
+      }
+    | undefined
+  > = {};
 
   constructor(
     private readonly elasticSearchClientOptions: ElasticSearchClientOptions,
     private readonly aliasPostfix: string,
     private readonly indexPrefix: string,
     private readonly logger: Logger,
+    private readonly permissions: PermissionAuthorizer,
   ) {
     this.elasticSearchClient = this.newClient(options => new Client(options));
   }
@@ -86,6 +146,7 @@ export class ElasticSearchSearchEngine implements SearchEngine {
   static async fromConfig({
     logger,
     config,
+    permissions,
     aliasPostfix = `search`,
     indexPrefix = ``,
   }: ElasticSearchOptions) {
@@ -105,6 +166,7 @@ export class ElasticSearchSearchEngine implements SearchEngine {
       aliasPostfix,
       indexPrefix,
       logger,
+      permissions,
     );
   }
 
@@ -117,10 +179,42 @@ export class ElasticSearchSearchEngine implements SearchEngine {
     return create(this.elasticSearchClientOptions);
   }
 
-  protected translator(query: SearchQuery): ConcreteElasticSearchQuery {
+  protected translator(
+    query: SearchQuery,
+    authorization: Map<string, AuthorizeResponse>,
+  ): ConcreteElasticSearchQuery {
     const { term, filters = {}, types, pageCursor } = query;
 
-    const filter = Object.entries(filters)
+    const authorizationFilter = (types ?? []).map(type => {
+      const authz = authorization.get(type);
+
+      if (authz?.result === AuthorizeResult.DENY) {
+        return esb
+          .boolQuery()
+          .mustNot(
+            esb.termsQuery('_index', this.constructIndexName(type, '*')),
+          );
+      }
+
+      if (authz?.result === AuthorizeResult.CONDITIONAL) {
+        const conditions = this.permissionInfo[type]?.conditionTransformer(
+          authz?.conditions,
+        );
+
+        return esb
+          .boolQuery()
+          .filter(esb.termsQuery('_index', this.constructIndexName(type, '*')))
+          .filter(convertToEsb(conditions));
+      }
+
+      // No authorization required for this type
+      // Blanket approval for this type
+      return esb.termsQuery('_index', this.constructIndexName(type, '*'));
+    });
+
+    console.log(JSON.stringify(authorizationFilter, null, 2));
+
+    const queryFilter = Object.entries(filters)
       .filter(([_, value]) => Boolean(value))
       .map(([key, value]: [key: string, value: any]) => {
         if (['string', 'number', 'boolean'].includes(typeof value)) {
@@ -152,7 +246,12 @@ export class ElasticSearchSearchEngine implements SearchEngine {
     return {
       elasticSearchQuery: esb
         .requestBodySearch()
-        .query(esb.boolQuery().filter(filter).must([esbQuery]))
+        .query(
+          esb
+            .boolQuery()
+            .filter([...authorizationFilter, ...queryFilter])
+            .must([esbQuery]),
+        )
         .from(page * pageSize)
         .size(pageSize)
         .toJSON(),
@@ -165,13 +264,25 @@ export class ElasticSearchSearchEngine implements SearchEngine {
     this.translator = translator;
   }
 
-  async index(type: string, documents: IndexableDocument[]): Promise<void> {
+  async index(
+    type: string,
+    documents: IndexableDocument[],
+    permissionInfo?: {
+      permission: Permission;
+      conditionTransformer: (
+        conditions: PermissionCriteria<PermissionCondition>,
+      ) => object;
+    },
+  ): Promise<void> {
     this.logger.info(
       `Started indexing ${documents.length} documents for index ${type}`,
     );
     const startTimestamp = process.hrtime();
     const alias = this.constructSearchAlias(type);
     const index = this.constructIndexName(type, `${Date.now()}`);
+
+    this.permissionInfo[type] = permissionInfo;
+
     try {
       const aliases = await this.elasticSearchClient.cat.aliases({
         format: 'json',
@@ -184,6 +295,7 @@ export class ElasticSearchSearchEngine implements SearchEngine {
       await this.elasticSearchClient.indices.create({
         index,
       });
+
       const result = await this.elasticSearchClient.helpers.bulk({
         datasource: documents,
         onDocument() {
@@ -228,12 +340,46 @@ export class ElasticSearchSearchEngine implements SearchEngine {
     }
   }
 
-  async query(query: SearchQuery): Promise<SearchResultSet> {
-    const { elasticSearchQuery, documentTypes, pageSize } =
-      this.translator(query);
-    const queryIndices = documentTypes
-      ? documentTypes.map(it => this.constructSearchAlias(it))
+  async query(
+    query: SearchQuery,
+    options?: { token: string },
+  ): Promise<SearchResultSet> {
+    const permissionedDocumentTypes = (query.types ?? []).filter(
+      type => !!this.permissionInfo[type],
+    );
+
+    const authorizeResults = await this.permissions.authorize(
+      permissionedDocumentTypes.map(type => ({
+        permission: this.permissionInfo[type]!.permission,
+      })),
+      options,
+    );
+
+    const resultMap = new Map(
+      authorizeResults.map((result, index) => [
+        permissionedDocumentTypes[index],
+        result,
+      ]),
+    );
+
+    const queryIndices = query.types
+      ? query.types.reduce((acc, type) => {
+          const authorizeResult = resultMap.get(type);
+
+          if (authorizeResult?.result !== AuthorizeResult.DENY) {
+            acc.push(this.constructSearchAlias(type));
+          }
+
+          return acc;
+        }, [] as string[])
       : this.constructSearchAlias('*');
+
+    if (queryIndices.length === 0) {
+      return { results: [] };
+    }
+
+    const { elasticSearchQuery, pageSize } = this.translator(query, resultMap);
+
     try {
       const result = await this.elasticSearchClient.search({
         index: queryIndices,
@@ -248,6 +394,8 @@ export class ElasticSearchSearchEngine implements SearchEngine {
       const previousPageCursor = hasPreviousPage
         ? encodePageCursor({ page: page - 1 })
         : undefined;
+
+      console.log(result.body.hits.hits?.[0]);
 
       return {
         results: result.body.hits.hits.map((d: ElasticSearchResult) => ({

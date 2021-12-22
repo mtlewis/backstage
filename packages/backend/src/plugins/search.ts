@@ -19,6 +19,8 @@ import {
 } from '@backstage/backend-common';
 import { Config } from '@backstage/config';
 import { DefaultCatalogCollator } from '@backstage/plugin-catalog-backend';
+import { PermissionAuthorizer } from '@backstage/plugin-permission-common';
+import { isComponentType } from '@backstage/plugin-permission-policy-simple';
 import { createRouter } from '@backstage/plugin-search-backend';
 import { ElasticSearchSearchEngine } from '@backstage/plugin-search-backend-module-elasticsearch';
 import { PgSearchEngine } from '@backstage/plugin-search-backend-module-pg';
@@ -27,7 +29,7 @@ import {
   LunrSearchEngine,
   SearchEngine,
 } from '@backstage/plugin-search-backend-node';
-import { DefaultTechDocsCollator } from '@backstage/plugin-techdocs-backend';
+// import { DefaultTechDocsCollator } from '@backstage/plugin-techdocs-backend';
 import { Logger } from 'winston';
 import { PluginEnvironment } from '../types';
 
@@ -35,15 +37,18 @@ async function createSearchEngine({
   logger,
   database,
   config,
+  permissions,
 }: {
   logger: Logger;
   database: PluginDatabaseManager;
   config: Config;
+  permissions: PermissionAuthorizer;
 }): Promise<SearchEngine> {
   if (config.has('search.elasticsearch')) {
     return await ElasticSearchSearchEngine.fromConfig({
       logger,
       config,
+      permissions,
     });
   }
 
@@ -60,9 +65,15 @@ export default async function createPlugin({
   config,
   database,
   tokenManager,
+  permissions,
 }: PluginEnvironment) {
   // Initialize a connection to a search engine.
-  const searchEngine = await createSearchEngine({ config, logger, database });
+  const searchEngine = await createSearchEngine({
+    config,
+    logger,
+    database,
+    permissions,
+  });
   const indexBuilder = new IndexBuilder({ logger, searchEngine });
 
   // Collators are responsible for gathering documents known to plugins. This
@@ -72,17 +83,18 @@ export default async function createPlugin({
     collator: DefaultCatalogCollator.fromConfig(config, {
       discovery,
       tokenManager,
+      customPermissionRules: [isComponentType],
     }),
   });
 
-  indexBuilder.addCollator({
-    defaultRefreshIntervalSeconds: 600,
-    collator: DefaultTechDocsCollator.fromConfig(config, {
-      discovery,
-      logger,
-      tokenManager,
-    }),
-  });
+  // indexBuilder.addCollator({
+  //   defaultRefreshIntervalSeconds: 600,
+  //   collator: DefaultTechDocsCollator.fromConfig(config, {
+  //     discovery,
+  //     logger,
+  //     tokenManager,
+  //   }),
+  // });
 
   // The scheduler controls when documents are gathered from collators and sent
   // to the search engine for indexing.

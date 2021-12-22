@@ -21,7 +21,6 @@ import {
 import {
   catalogEntityReadPermission,
   Entity,
-  stringifyEntityRef,
   UserEntity,
 } from '@backstage/catalog-model';
 import { IndexableDocument, DocumentCollator } from '@backstage/search-common';
@@ -31,16 +30,23 @@ import {
   CatalogClient,
   CatalogEntitiesRequest,
 } from '@backstage/catalog-client';
+import {
+  createConditionTransformer,
+  PermissionRule,
+} from '@backstage/plugin-permission-node';
+import * as catalogPermissionRules from '../permissions/rules';
+import { EntitiesSearchFilter } from '../catalog';
+import { buildEntitySearch } from '../stitching/buildEntitySearch';
 
-export interface CatalogEntityDocument extends IndexableDocument {
-  componentType: string;
-  namespace: string;
-  kind: string;
-  lifecycle: string;
-  owner: string;
-}
+export type CatalogEntityDocument = IndexableDocument<any>;
 
-export class DefaultCatalogCollator implements DocumentCollator {
+export class DefaultCatalogCollator
+  implements DocumentCollator<CatalogEntityDocument>
+{
+  private readonly customPermissionRules: PermissionRule<
+    Entity,
+    EntitiesSearchFilter
+  >[];
   protected discovery: PluginEndpointDiscovery;
   protected locationTemplate: string;
   protected filter?: CatalogEntitiesRequest['filter'];
@@ -54,6 +60,7 @@ export class DefaultCatalogCollator implements DocumentCollator {
       discovery: PluginEndpointDiscovery;
       tokenManager: TokenManager;
       filter?: CatalogEntitiesRequest['filter'];
+      customPermissionRules?: PermissionRule<Entity, EntitiesSearchFilter>[];
     },
   ) {
     return new DefaultCatalogCollator({
@@ -67,9 +74,16 @@ export class DefaultCatalogCollator implements DocumentCollator {
     locationTemplate?: string;
     filter?: CatalogEntitiesRequest['filter'];
     catalogClient?: CatalogApi;
+    customPermissionRules?: PermissionRule<Entity, EntitiesSearchFilter>[];
   }) {
-    const { discovery, locationTemplate, filter, catalogClient, tokenManager } =
-      options;
+    const {
+      discovery,
+      locationTemplate,
+      filter,
+      catalogClient,
+      tokenManager,
+      customPermissionRules,
+    } = options;
 
     this.discovery = discovery;
     this.locationTemplate =
@@ -78,6 +92,7 @@ export class DefaultCatalogCollator implements DocumentCollator {
     this.catalogClient =
       catalogClient || new CatalogClient({ discoveryApi: discovery });
     this.tokenManager = tokenManager;
+    this.customPermissionRules = customPermissionRules ?? [];
   }
 
   protected applyArgsToFormat(
@@ -109,6 +124,17 @@ export class DefaultCatalogCollator implements DocumentCollator {
     return documentText;
   }
 
+  documentReadPermission() {
+    return catalogEntityReadPermission;
+  }
+
+  createConditionTransformer() {
+    return createConditionTransformer([
+      ...Object.values(catalogPermissionRules),
+      ...this.customPermissionRules,
+    ]);
+  }
+
   async execute() {
     const { token } = await this.tokenManager.getToken();
     const response = await this.catalogClient.getEntities(
@@ -118,7 +144,7 @@ export class DefaultCatalogCollator implements DocumentCollator {
       { token },
     );
     return response.items.map((entity: Entity): CatalogEntityDocument => {
-      return {
+      const result = {
         title: entity.metadata.title ?? entity.metadata.name,
         location: this.applyArgsToFormat(this.locationTemplate, {
           namespace: entity.metadata.namespace || 'default',
@@ -126,16 +152,20 @@ export class DefaultCatalogCollator implements DocumentCollator {
           name: entity.metadata.name,
         }),
         text: this.getDocumentText(entity),
-        componentType: entity.spec?.type?.toString() || 'other',
-        namespace: entity.metadata.namespace || 'default',
-        kind: entity.kind,
-        lifecycle: (entity.spec?.lifecycle as string) || '',
-        owner: (entity.spec?.owner as string) || '',
-        authorization: {
-          permission: catalogEntityReadPermission,
-          resourceRef: stringifyEntityRef(entity),
-        },
+        resource: buildEntitySearch('_ignored', entity).reduce(
+          (acc, { key, value }) => {
+            // TODO(mtlewis) figure out a workaround for this conflict -
+            if (value !== null && !['true', 'false'].includes(value)) {
+              acc[key] = value;
+            }
+
+            return acc;
+          },
+          {} as Record<string, string | null>,
+        ),
       };
+
+      return result;
     });
   }
 }
