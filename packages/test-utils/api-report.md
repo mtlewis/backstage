@@ -7,8 +7,8 @@ import { AnalyticsApi } from '@backstage/core-plugin-api';
 import { AnalyticsEvent } from '@backstage/core-plugin-api';
 import { ApiHolder } from '@backstage/core-plugin-api';
 import { ApiRef } from '@backstage/core-plugin-api';
-import { AuthorizeRequest } from '@backstage/plugin-permission-common';
-import { AuthorizeResponse } from '@backstage/plugin-permission-common';
+import { AuthorizeDecision } from '@backstage/plugin-permission-common';
+import { AuthorizeQuery } from '@backstage/plugin-permission-common';
 import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import { ComponentType } from 'react';
 import { Config } from '@backstage/config';
@@ -121,11 +121,11 @@ export type MockErrorApiOptions = {
 export class MockPermissionApi implements PermissionApi {
   constructor(
     requestHandler?: (
-      request: AuthorizeRequest,
+      request: AuthorizeQuery,
     ) => AuthorizeResult.ALLOW | AuthorizeResult.DENY,
   );
   // (undocumented)
-  authorize(request: AuthorizeRequest): Promise<AuthorizeResponse>;
+  authorize(request: AuthorizeQuery): Promise<AuthorizeDecision>;
 }
 
 // @public

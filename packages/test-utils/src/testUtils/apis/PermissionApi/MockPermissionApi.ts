@@ -16,8 +16,8 @@
 
 import { PermissionApi } from '@backstage/plugin-permission-react';
 import {
-  AuthorizeRequest,
-  AuthorizeResponse,
+  AuthorizeDecision,
+  AuthorizeQuery,
   AuthorizeResult,
 } from '@backstage/plugin-permission-common';
 
@@ -30,12 +30,12 @@ import {
 export class MockPermissionApi implements PermissionApi {
   constructor(
     private readonly requestHandler: (
-      request: AuthorizeRequest,
+      request: AuthorizeQuery,
     ) => AuthorizeResult.ALLOW | AuthorizeResult.DENY = () =>
       AuthorizeResult.ALLOW,
   ) {}
 
-  async authorize(request: AuthorizeRequest): Promise<AuthorizeResponse> {
+  async authorize(request: AuthorizeQuery): Promise<AuthorizeDecision> {
     return { result: this.requestHandler(request) };
   }
 }
