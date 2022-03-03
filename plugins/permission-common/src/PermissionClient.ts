@@ -26,8 +26,8 @@ import {
   Identified,
   PermissionCriteria,
   PermissionCondition,
-  AuthorizeResponse,
-  AuthorizeRequest,
+  DefinitiveAuthorizeDecision,
+  FetchConditionalDecisionQuery,
 } from './types/api';
 import { DiscoveryApi } from './types/discovery';
 import {
@@ -57,24 +57,39 @@ const permissionCriteriaSchema: z.ZodSchema<
     .or(z.object({ not: permissionCriteriaSchema }).strict()),
 );
 
-const responseSchema = z.object({
-  items: z.array(
-    z
-      .object({
-        id: z.string(),
-        result: z
-          .literal(AuthorizeResult.ALLOW)
-          .or(z.literal(AuthorizeResult.DENY)),
-      })
-      .or(
-        z.object({
-          id: z.string(),
-          result: z.literal(AuthorizeResult.CONDITIONAL),
-          conditions: permissionCriteriaSchema,
-        }),
-      ),
-  ),
+const definitiveDecisionSchema = z.object({
+  result: z.literal(AuthorizeResult.ALLOW).or(z.literal(AuthorizeResult.DENY)),
 });
+
+const conditionalDecisionSchema = z.object({
+  result: z.literal(AuthorizeResult.CONDITIONAL),
+  conditions: permissionCriteriaSchema,
+});
+
+const decisionSchema = z.union([
+  definitiveDecisionSchema,
+  conditionalDecisionSchema,
+]);
+
+const responseSchema = <T>(itemSchema: z.ZodSchema<T>, ids: Set<string>) =>
+  z.object({
+    items: z
+      .array(
+        z.intersection(
+          z.object({
+            id: z.string(),
+          }),
+          itemSchema,
+        ),
+      )
+      .refine(
+        items =>
+          items.length === ids.size && items.every(({ id }) => ids.has(id)),
+        {
+          message: 'Items in response do not match request',
+        },
+      ),
+  });
 
 /**
  * An isomorphic client for requesting authorization for Backstage permissions.
@@ -104,22 +119,37 @@ export class PermissionClient implements PermissionAuthorizer {
    * returned if no resourceRef is provided in the request. Conditional responses are intended only
    * for backends which have access to the data source for permissioned resources, so that filters
    * can be applied when loading collections of resources.
+   *
    * @public
    */
   async authorize(
     queries: AuthorizeQuery[],
     options?: AuthorizeRequestOptions,
-  ): Promise<AuthorizeDecision[]> {
-    // TODO(permissions): it would be great to provide some kind of typing guarantee that
-    // conditional responses will only ever be returned for requests containing a resourceType
-    // but no resourceRef. That way clients who aren't prepared to handle filtering according
-    // to conditions can be guaranteed that they won't unexpectedly get a CONDITIONAL response.
+  ): Promise<DefinitiveAuthorizeDecision[]> {
+    return this.makeAuthorizeRequest(
+      queries,
+      definitiveDecisionSchema,
+      options,
+    );
+  }
 
+  async fetchConditionalDecision(
+    queries: FetchConditionalDecisionQuery[],
+    options?: AuthorizeRequestOptions,
+  ): Promise<AuthorizeDecision[]> {
+    return this.makeAuthorizeRequest(queries, decisionSchema, options);
+  }
+
+  private async makeAuthorizeRequest<T>(
+    queries: AuthorizeQuery[] | FetchConditionalDecisionQuery[],
+    itemSchema: z.ZodSchema<T>,
+    options?: AuthorizeRequestOptions,
+  ) {
     if (!this.enabled) {
-      return queries.map(_ => ({ result: AuthorizeResult.ALLOW }));
+      return queries.map(_ => ({ result: AuthorizeResult.ALLOW as const }));
     }
 
-    const request: AuthorizeRequest = {
+    const request = {
       items: queries.map(query => ({
         id: uuid.v4(),
         ...query,
@@ -140,33 +170,21 @@ export class PermissionClient implements PermissionAuthorizer {
     }
 
     const responseBody = await response.json();
-    this.assertValidResponse(request, responseBody);
 
-    const responsesById = responseBody.items.reduce((acc, r) => {
+    const parsedResponse = responseSchema(
+      itemSchema,
+      new Set(request.items.map(({ id }) => id)),
+    ).parse(responseBody);
+
+    const responsesById = parsedResponse.items.reduce((acc, r) => {
       acc[r.id] = r;
       return acc;
-    }, {} as Record<string, Identified<AuthorizeDecision>>);
+    }, {} as Record<string, Identified<T>>);
 
     return request.items.map(query => responsesById[query.id]);
   }
 
   private getAuthorizationHeader(token?: string): Record<string, string> {
     return token ? { Authorization: `Bearer ${token}` } : {};
-  }
-
-  private assertValidResponse(
-    request: AuthorizeRequest,
-    json: any,
-  ): asserts json is AuthorizeResponse {
-    const authorizedResponses = responseSchema.parse(json);
-    const responseIds = authorizedResponses.items.map(r => r.id);
-    const hasAllRequestIds = request.items.every(r =>
-      responseIds.includes(r.id),
-    );
-    if (!hasAllRequestIds) {
-      throw new Error(
-        'Unexpected authorization response from permission-backend',
-      );
-    }
   }
 }

@@ -24,6 +24,8 @@ import {
   AuthorizeRequestOptions,
   AuthorizeDecision,
   AuthorizeResult,
+  DefinitiveAuthorizeDecision,
+  FetchConditionalDecisionQuery,
   PermissionClient,
   PermissionAuthorizer,
 } from '@backstage/plugin-permission-common';
@@ -80,18 +82,27 @@ export class ServerPermissionClient implements PermissionAuthorizer {
   async authorize(
     queries: AuthorizeQuery[],
     options?: AuthorizeRequestOptions,
+  ): Promise<DefinitiveAuthorizeDecision[]> {
+    return (await this.isEnabled(options?.token))
+      ? this.permissionClient.authorize(queries, options)
+      : queries.map(_ => ({ result: AuthorizeResult.ALLOW }));
+  }
+
+  async fetchConditionalDecision(
+    queries: FetchConditionalDecisionQuery[],
+    options?: AuthorizeRequestOptions,
   ): Promise<AuthorizeDecision[]> {
+    return (await this.isEnabled(options?.token))
+      ? this.permissionClient.fetchConditionalDecision(queries, options)
+      : queries.map(_ => ({ result: AuthorizeResult.ALLOW }));
+  }
+
+  private async isEnabled(token?: string) {
     // Check if permissions are enabled before validating the server token. That
     // way when permissions are disabled, the noop token manager can be used
     // without fouling up the logic inside the ServerPermissionClient, because
     // the code path won't be reached.
-    if (
-      !this.permissionEnabled ||
-      (await this.isValidServerToken(options?.token))
-    ) {
-      return queries.map(_ => ({ result: AuthorizeResult.ALLOW }));
-    }
-    return this.permissionClient.authorize(queries, options);
+    return this.permissionEnabled && !(await this.isValidServerToken(token));
   }
 
   private async isValidServerToken(

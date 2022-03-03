@@ -31,6 +31,9 @@ const mockPermissionAuthorizer: PermissionAuthorizer = {
   authorize: () => {
     throw new Error('Not implemented');
   },
+  fetchConditionalDecision: () => {
+    throw new Error('Not implemented');
+  },
 };
 
 describe('createRouter', () => {

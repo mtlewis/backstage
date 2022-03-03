@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { Permission } from './permission';
+import { NonResourcePermission, ResourcePermission } from './permission';
 
 /**
  * A request with a UUID identifier, so that batched responses can be matched up with the original
@@ -46,9 +46,20 @@ export enum AuthorizeResult {
  * An individual authorization request for {@link PermissionClient#authorize}.
  * @public
  */
-export type AuthorizeQuery = {
-  permission: Permission;
-  resourceRef?: string;
+export type AuthorizeQuery =
+  | {
+      permission: NonResourcePermission;
+      resourceRef?: never;
+    }
+  | { permission: ResourcePermission; resourceRef: string };
+
+/**
+ * An individual request to fetch authorization conditions via {@link PermissionClient#fetchConditionalDecision}.
+ * @public
+ */
+export type FetchConditionalDecisionQuery = {
+  permission: ResourcePermission;
+  resourceRef?: never;
 };
 
 /**
@@ -113,15 +124,29 @@ export type PermissionCriteria<TQuery> =
   | TQuery;
 
 /**
+ *
+ * @public
+ */
+export type DefinitiveAuthorizeDecision = {
+  result: AuthorizeResult.ALLOW | AuthorizeResult.DENY;
+};
+
+/**
+ *
+ * @public
+ */
+export type ConditionalAuthorizeDecision = {
+  result: AuthorizeResult.CONDITIONAL;
+  conditions: PermissionCriteria<PermissionCondition>;
+};
+
+/**
  * An individual authorization response from {@link PermissionClient#authorize}.
  * @public
  */
 export type AuthorizeDecision =
-  | { result: AuthorizeResult.ALLOW | AuthorizeResult.DENY }
-  | {
-      result: AuthorizeResult.CONDITIONAL;
-      conditions: PermissionCriteria<PermissionCondition>;
-    };
+  | DefinitiveAuthorizeDecision
+  | ConditionalAuthorizeDecision;
 
 /**
  * A batch of authorization responses from {@link PermissionClient#authorize}.

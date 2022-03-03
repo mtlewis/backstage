@@ -17,6 +17,7 @@
 import { useApi } from '@backstage/core-plugin-api';
 import { permissionApiRef } from '../apis';
 import {
+  AuthorizeQuery,
   AuthorizeResult,
   Permission,
 } from '@backstage/plugin-permission-common';
@@ -48,7 +49,13 @@ export const usePermission = (
 ): AsyncPermissionResult => {
   const permissionApi = useApi(permissionApiRef);
   const { data, error } = useSWR({ permission, resourceRef }, async args => {
-    const { result } = await permissionApi.authorize(args);
+    // If a ResourcePermission is supplied as the permission but no resource
+    // is included, short-circuit to a deny.
+    if (args.permission.resourceType && !args.resourceRef) {
+      return AuthorizeResult.DENY;
+    }
+
+    const { result } = await permissionApi.authorize(args as AuthorizeQuery);
     return result;
   });
 

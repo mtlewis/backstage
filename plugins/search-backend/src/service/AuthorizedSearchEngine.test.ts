@@ -18,6 +18,7 @@ import { ConfigReader } from '@backstage/config';
 import {
   AuthorizeDecision,
   AuthorizeResult,
+  ConditionalAuthorizeDecision,
   PermissionAuthorizer,
 } from '@backstage/plugin-permission-common';
 import {
@@ -71,9 +72,13 @@ describe('AuthorizedSearchEngine', () => {
   const mockedAuthorize: jest.MockedFunction<
     PermissionAuthorizer['authorize']
   > = jest.fn();
+  const mockedFetchConditionalDecision: jest.MockedFunction<
+    PermissionAuthorizer['fetchConditionalDecision']
+  > = jest.fn();
 
   const permissionAuthorizer: PermissionAuthorizer = {
     authorize: mockedAuthorize,
+    fetchConditionalDecision: mockedFetchConditionalDecision,
   };
 
   const defaultTypes: Record<string, DocumentTypeInfo> = {
@@ -81,24 +86,28 @@ describe('AuthorizedSearchEngine', () => {
       visibilityPermission: {
         name: 'search.users.read',
         attributes: { action: 'read' },
+        resourceType: 'user',
       },
     },
     [typeTemplates]: {
       visibilityPermission: {
         name: 'search.templates.read',
         attributes: { action: 'read' },
+        resourceType: 'template',
       },
     },
     [typeServices]: {
       visibilityPermission: {
         name: 'search.services.read',
         attributes: { action: 'read' },
+        resourceType: 'service',
       },
     },
     [typeGroups]: {
       visibilityPermission: {
         name: 'search.groups.read',
         attributes: { action: 'read' },
+        resourceType: 'group',
       },
     },
   };
@@ -227,18 +236,14 @@ describe('AuthorizedSearchEngine', () => {
       queries.map(query => {
         if (
           query.permission.name ===
-          defaultTypes.users.visibilityPermission?.name
+            defaultTypes.users.visibilityPermission?.name &&
+          query.resourceRef
         ) {
-          if (query.resourceRef) {
-            return {
-              result: query.resourceRef.endsWith(userToBeReturned.toString())
-                ? AuthorizeResult.ALLOW
-                : AuthorizeResult.DENY,
-            };
-          }
           return {
-            result: AuthorizeResult.CONDITIONAL,
-          } as AuthorizeDecision;
+            result: query.resourceRef.endsWith(userToBeReturned.toString())
+              ? AuthorizeResult.ALLOW
+              : AuthorizeResult.DENY,
+          };
         }
 
         return {
@@ -279,18 +284,19 @@ describe('AuthorizedSearchEngine', () => {
       results: searchResults,
     }));
 
-    mockedAuthorize.mockImplementation(async queries =>
-      queries.map(query => {
-        if (query.resourceRef) {
-          return {
-            result: AuthorizeResult.ALLOW,
-          };
-        }
+    mockedFetchConditionalDecision.mockImplementation(async queries =>
+      queries.map(
+        _ =>
+          ({
+            result: AuthorizeResult.CONDITIONAL,
+          } as ConditionalAuthorizeDecision),
+      ),
+    );
 
-        return {
-          result: AuthorizeResult.CONDITIONAL,
-        } as AuthorizeDecision;
-      }),
+    mockedAuthorize.mockImplementation(async queries =>
+      queries.map(_ => ({
+        result: AuthorizeResult.ALLOW,
+      })),
     );
 
     await expect(
@@ -324,15 +330,16 @@ describe('AuthorizedSearchEngine', () => {
   });
 
   it('should perform search until the target number of results is reached', async () => {
-    mockedAuthorize.mockImplementation(async queries =>
-      queries.map(query => {
-        if (query.resourceRef) {
-          return {
-            result: AuthorizeResult.ALLOW,
-          };
-        }
-        return { result: AuthorizeResult.CONDITIONAL } as AuthorizeDecision;
-      }),
+    mockedFetchConditionalDecision.mockImplementation(async queries =>
+      queries.map(
+        _ => ({ result: AuthorizeResult.CONDITIONAL } as AuthorizeDecision),
+      ),
+    );
+
+    mockedFetchConditionalDecision.mockImplementation(async queries =>
+      queries.map(_ => ({
+        result: AuthorizeResult.ALLOW,
+      })),
     );
 
     const usersWithAuth = generateSampleResults(typeUsers, true);
@@ -398,18 +405,22 @@ describe('AuthorizedSearchEngine', () => {
   });
 
   it('should perform search until the target number of results is reached, excluding unauthorized results', async () => {
+    mockedFetchConditionalDecision.mockImplementation(async queries =>
+      queries.map(
+        _ =>
+          ({
+            result: AuthorizeResult.CONDITIONAL,
+          } as ConditionalAuthorizeDecision),
+      ),
+    );
+
     mockedAuthorize.mockImplementation(async queries =>
-      queries.map(query => {
-        if (query.resourceRef) {
-          return {
-            result:
-              query.permission.name === 'search.services.read'
-                ? AuthorizeResult.DENY
-                : AuthorizeResult.ALLOW,
-          };
-        }
-        return { result: AuthorizeResult.CONDITIONAL } as AuthorizeDecision;
-      }),
+      queries.map(query => ({
+        result:
+          query.permission.name === 'search.services.read'
+            ? AuthorizeResult.DENY
+            : AuthorizeResult.ALLOW,
+      })),
     );
 
     const usersWithAuth = generateSampleResults(typeUsers, true);
@@ -485,13 +496,19 @@ describe('AuthorizedSearchEngine', () => {
   });
 
   it('should discard results until the target cursor is reached', async () => {
+    mockedFetchConditionalDecision.mockImplementation(async queries =>
+      queries.map(
+        _ =>
+          ({
+            result: AuthorizeResult.CONDITIONAL,
+          } as ConditionalAuthorizeDecision),
+      ),
+    );
+
     mockedAuthorize.mockImplementation(async queries =>
-      queries.map(query => {
-        if (query.resourceRef) {
-          return { result: AuthorizeResult.ALLOW };
-        }
-        return { result: AuthorizeResult.CONDITIONAL } as AuthorizeDecision;
-      }),
+      queries.map(_ => ({
+        result: AuthorizeResult.ALLOW,
+      })),
     );
 
     const usersWithAuth = generateSampleResults(typeUsers, true);

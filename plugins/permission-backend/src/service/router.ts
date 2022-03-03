@@ -35,6 +35,7 @@ import {
   Identified,
   AuthorizeRequest,
   AuthorizeResponse,
+  PermissionAttributes,
 } from '@backstage/plugin-permission-common';
 import {
   ApplyConditionsRequestEntry,
@@ -46,24 +47,36 @@ import { memoize } from 'lodash';
 import DataLoader from 'dataloader';
 import { Config } from '@backstage/config';
 
-const querySchema: z.ZodSchema<Identified<AuthorizeQuery>> = z.object({
-  id: z.string(),
-  resourceRef: z.string().optional(),
-  permission: z.object({
-    name: z.string(),
-    resourceType: z.string().optional(),
-    attributes: z.object({
-      action: z
-        .union([
-          z.literal('create'),
-          z.literal('read'),
-          z.literal('update'),
-          z.literal('delete'),
-        ])
-        .optional(),
+const attributesSchema: z.ZodSchema<PermissionAttributes> = z.object({
+  action: z
+    .union([
+      z.literal('create'),
+      z.literal('read'),
+      z.literal('update'),
+      z.literal('delete'),
+    ])
+    .optional(),
+});
+
+const querySchema: z.ZodSchema<Identified<AuthorizeQuery>> = z.union([
+  z.object({
+    id: z.string(),
+    permission: z.object({
+      name: z.string(),
+      resourceType: z.string(),
+      attributes: attributesSchema,
+    }),
+    resourceRef: z.string(),
+  }),
+  z.object({
+    id: z.string(),
+    permission: z.object({
+      name: z.string(),
+      resourceType: z.never().optional(),
+      attributes: attributesSchema,
     }),
   }),
-});
+]);
 
 const requestSchema: z.ZodSchema<AuthorizeRequest> = z.object({
   items: z.array(querySchema),

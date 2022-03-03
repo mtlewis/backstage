@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The Backstage Authors
+ * Copyright 2022 The Backstage Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,28 +14,30 @@
  * limitations under the License.
  */
 
-export { AuthorizeResult } from './api';
-export type {
-  AuthorizeQuery,
-  AuthorizeRequest,
-  AuthorizeDecision,
-  AuthorizeResponse,
-  ConditionalAuthorizeDecision,
-  DefinitiveAuthorizeDecision,
-  FetchConditionalDecisionQuery,
-  Identified,
-  PermissionCondition,
-  PermissionCriteria,
-  AllOfCriteria,
-  AnyOfCriteria,
-  NotCriteria,
-} from './api';
-export type { DiscoveryApi } from './discovery';
-export type {
+import {
   NonResourcePermission,
   PermissionAttributes,
-  Permission,
-  PermissionAuthorizer,
   ResourcePermission,
-  AuthorizeRequestOptions,
-} from './permission';
+} from '../types';
+
+/**
+ *
+ *
+ * @public
+ */
+export function createPermission(input: {
+  name: string;
+  attributes: PermissionAttributes;
+  resourceType: string;
+}): ResourcePermission;
+export function createPermission(input: {
+  name: string;
+  attributes: PermissionAttributes;
+}): NonResourcePermission;
+export function createPermission(input: {
+  name: string;
+  attributes: PermissionAttributes;
+  resourceType?: string;
+}) {
+  return input;
+}

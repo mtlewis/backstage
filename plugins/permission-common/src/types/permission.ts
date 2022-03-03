@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
-import { AuthorizeQuery, AuthorizeDecision } from './api';
+import {
+  AuthorizeQuery,
+  AuthorizeDecision,
+  FetchConditionalDecisionQuery,
+  DefinitiveAuthorizeDecision,
+} from './api';
 
 /**
  * The attributes related to a given permission; these should be generic and widely applicable to
@@ -53,7 +58,24 @@ export type Permission = {
    * denotes the type of the resource whose resourceRef should be passed when
    * authorizing.
    */
-  resourceType?: string;
+  resourceType?: string; // TODO(mtlewis): can we get rid of this perhaps?
+};
+
+/**
+ * ResourcePermissions are {@link Permission}s that can be authorized based on
+ * characteristics of a resource such a catalog entity.
+ * @public
+ */
+export type ResourcePermission = Permission & {
+  /**
+   * Denotes the type of the resource whose resourceRef should be passed when
+   * authorizing.
+   */
+  resourceType: string;
+};
+
+export type NonResourcePermission = Permission & {
+  resourceType?: never;
 };
 
 /**
@@ -63,6 +85,11 @@ export type Permission = {
 export interface PermissionAuthorizer {
   authorize(
     queries: AuthorizeQuery[],
+    options?: AuthorizeRequestOptions,
+  ): Promise<DefinitiveAuthorizeDecision[]>;
+
+  fetchConditionalDecision(
+    queries: FetchConditionalDecisionQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<AuthorizeDecision[]>;
 }
