@@ -21,13 +21,13 @@ import * as uuid from 'uuid';
 import { z } from 'zod';
 import {
   AuthorizeResult,
-  AuthorizeQuery,
   AuthorizeDecision,
   Identified,
   PermissionCriteria,
   PermissionCondition,
   DefinitiveAuthorizeDecision,
-  FetchConditionalDecisionQuery,
+  ConditionalAuthorizeQuery,
+  DefinitiveAuthorizeQuery,
 } from './types/api';
 import { DiscoveryApi } from './types/discovery';
 import {
@@ -123,7 +123,7 @@ export class PermissionClient implements PermissionAuthorizer {
    * @public
    */
   async authorize(
-    queries: AuthorizeQuery[],
+    queries: DefinitiveAuthorizeQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<DefinitiveAuthorizeDecision[]> {
     return this.makeAuthorizeRequest(
@@ -134,14 +134,14 @@ export class PermissionClient implements PermissionAuthorizer {
   }
 
   async fetchConditionalDecision(
-    queries: FetchConditionalDecisionQuery[],
+    queries: ConditionalAuthorizeQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<AuthorizeDecision[]> {
     return this.makeAuthorizeRequest(queries, decisionSchema, options);
   }
 
   private async makeAuthorizeRequest<T>(
-    queries: AuthorizeQuery[] | FetchConditionalDecisionQuery[],
+    queries: ConditionalAuthorizeQuery[] | DefinitiveAuthorizeQuery[],
     itemSchema: z.ZodSchema<T>,
     options?: AuthorizeRequestOptions,
   ) {

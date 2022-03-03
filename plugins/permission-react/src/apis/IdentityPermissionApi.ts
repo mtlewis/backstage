@@ -17,9 +17,9 @@
 import { DiscoveryApi, IdentityApi } from '@backstage/core-plugin-api';
 import { PermissionApi } from './PermissionApi';
 import {
-  AuthorizeQuery,
-  AuthorizeDecision,
   PermissionClient,
+  DefinitiveAuthorizeQuery,
+  DefinitiveAuthorizeDecision,
 } from '@backstage/plugin-permission-common';
 import { Config } from '@backstage/config';
 
@@ -44,7 +44,9 @@ export class IdentityPermissionApi implements PermissionApi {
     return new IdentityPermissionApi(permissionClient, identity);
   }
 
-  async authorize(request: AuthorizeQuery): Promise<AuthorizeDecision> {
+  async authorize(
+    request: DefinitiveAuthorizeQuery,
+  ): Promise<DefinitiveAuthorizeDecision> {
     const response = await this.permissionClient.authorize(
       [request],
       await this.identityApi.getCredentials(),

@@ -20,14 +20,14 @@ import {
 } from '@backstage/backend-common';
 import { Config } from '@backstage/config';
 import {
-  AuthorizeQuery,
   AuthorizeRequestOptions,
   AuthorizeDecision,
   AuthorizeResult,
   DefinitiveAuthorizeDecision,
-  FetchConditionalDecisionQuery,
   PermissionClient,
   PermissionAuthorizer,
+  ConditionalAuthorizeQuery,
+  DefinitiveAuthorizeQuery,
 } from '@backstage/plugin-permission-common';
 
 /**
@@ -80,7 +80,7 @@ export class ServerPermissionClient implements PermissionAuthorizer {
   }
 
   async authorize(
-    queries: AuthorizeQuery[],
+    queries: DefinitiveAuthorizeQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<DefinitiveAuthorizeDecision[]> {
     return (await this.isEnabled(options?.token))
@@ -89,7 +89,7 @@ export class ServerPermissionClient implements PermissionAuthorizer {
   }
 
   async fetchConditionalDecision(
-    queries: FetchConditionalDecisionQuery[],
+    queries: ConditionalAuthorizeQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<AuthorizeDecision[]> {
     return (await this.isEnabled(options?.token))

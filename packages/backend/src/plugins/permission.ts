@@ -14,18 +14,35 @@
  * limitations under the License.
  */
 
-import { IdentityClient } from '@backstage/plugin-auth-node';
+import {
+  BackstageIdentityResponse,
+  IdentityClient,
+} from '@backstage/plugin-auth-node';
+import {
+  catalogConditions,
+  createCatalogPolicyDecision,
+} from '@backstage/plugin-catalog-backend';
 import { createRouter } from '@backstage/plugin-permission-backend';
 import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import {
   PermissionPolicy,
+  PolicyAuthorizeQuery,
   PolicyDecision,
 } from '@backstage/plugin-permission-node';
 import { Router } from 'express';
 import { PluginEnvironment } from '../types';
 
 class AllowAllPermissionPolicy implements PermissionPolicy {
-  async handle(): Promise<PolicyDecision> {
+  async handle(
+    request: PolicyAuthorizeQuery,
+    _user?: BackstageIdentityResponse,
+  ): Promise<PolicyDecision> {
+    if (request.permission.name === 'catalog.entity.delete') {
+      return createCatalogPolicyDecision(
+        catalogConditions.hasSpec('type', 'website'),
+      );
+    }
+
     return {
       result: AuthorizeResult.ALLOW,
     };

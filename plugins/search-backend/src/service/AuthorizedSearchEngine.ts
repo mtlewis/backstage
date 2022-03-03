@@ -21,7 +21,8 @@ import {
   AuthorizeDecision,
   AuthorizeQuery,
   AuthorizeResult,
-  FetchConditionalDecisionQuery,
+  ConditionalAuthorizeQuery,
+  DefinitiveAuthorizeQuery,
   PermissionAuthorizer,
 } from '@backstage/plugin-permission-common';
 import {
@@ -90,7 +91,7 @@ export class AuthorizedSearchEngine implements SearchEngine {
     const queryStartTime = Date.now();
 
     const conditionFetcher = new DataLoader(
-      (requests: readonly FetchConditionalDecisionQuery[]) =>
+      (requests: readonly ConditionalAuthorizeQuery[]) =>
         this.permissions.fetchConditionalDecision(requests.slice(), options),
       {
         cacheKeyFn: ({ permission: { name } }) => name,
@@ -98,7 +99,7 @@ export class AuthorizedSearchEngine implements SearchEngine {
     );
 
     const authorizer = new DataLoader(
-      (requests: readonly AuthorizeQuery[]) =>
+      (requests: readonly DefinitiveAuthorizeQuery[]) =>
         this.permissions.authorize(requests.slice(), options),
       {
         // Serialize the permission name and resourceRef as

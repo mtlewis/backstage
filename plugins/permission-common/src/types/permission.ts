@@ -15,10 +15,10 @@
  */
 
 import {
-  AuthorizeQuery,
   AuthorizeDecision,
-  FetchConditionalDecisionQuery,
   DefinitiveAuthorizeDecision,
+  ConditionalAuthorizeQuery,
+  DefinitiveAuthorizeQuery,
 } from './api';
 
 /**
@@ -66,12 +66,12 @@ export type Permission = {
  * characteristics of a resource such a catalog entity.
  * @public
  */
-export type ResourcePermission = Permission & {
+export type ResourcePermission<T extends string = string> = Permission & {
   /**
    * Denotes the type of the resource whose resourceRef should be passed when
    * authorizing.
    */
-  resourceType: string;
+  resourceType: T;
 };
 
 export type NonResourcePermission = Permission & {
@@ -84,12 +84,12 @@ export type NonResourcePermission = Permission & {
  */
 export interface PermissionAuthorizer {
   authorize(
-    queries: AuthorizeQuery[],
+    queries: DefinitiveAuthorizeQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<DefinitiveAuthorizeDecision[]>;
 
   fetchConditionalDecision(
-    queries: FetchConditionalDecisionQuery[],
+    queries: ConditionalAuthorizeQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<AuthorizeDecision[]>;
 }

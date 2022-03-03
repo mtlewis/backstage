@@ -66,6 +66,15 @@ const querySchema: z.ZodSchema<Identified<AuthorizeQuery>> = z.union([
       resourceType: z.string(),
       attributes: attributesSchema,
     }),
+    resourceRef: z.never().optional(),
+  }),
+  z.object({
+    id: z.string(),
+    permission: z.object({
+      name: z.string(),
+      resourceType: z.string(),
+      attributes: attributesSchema,
+    }),
     resourceRef: z.string(),
   }),
   z.object({

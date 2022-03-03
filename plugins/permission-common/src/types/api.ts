@@ -42,11 +42,7 @@ export enum AuthorizeResult {
   CONDITIONAL = 'CONDITIONAL',
 }
 
-/**
- * An individual authorization request for {@link PermissionClient#authorize}.
- * @public
- */
-export type AuthorizeQuery =
+export type DefinitiveAuthorizeQuery =
   | {
       permission: NonResourcePermission;
       resourceRef?: never;
@@ -57,10 +53,18 @@ export type AuthorizeQuery =
  * An individual request to fetch authorization conditions via {@link PermissionClient#fetchConditionalDecision}.
  * @public
  */
-export type FetchConditionalDecisionQuery = {
+export type ConditionalAuthorizeQuery = {
   permission: ResourcePermission;
   resourceRef?: never;
 };
+
+/**
+ * An individual authorization request for {@link PermissionClient#authorize}.
+ * @public
+ */
+export type AuthorizeQuery =
+  | DefinitiveAuthorizeQuery
+  | ConditionalAuthorizeQuery;
 
 /**
  * A batch of authorization requests from {@link PermissionClient#authorize}.

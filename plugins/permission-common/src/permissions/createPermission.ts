@@ -25,11 +25,11 @@ import {
  *
  * @public
  */
-export function createPermission(input: {
+export function createPermission<T extends string>(input: {
   name: string;
   attributes: PermissionAttributes;
-  resourceType: string;
-}): ResourcePermission;
+  resourceType: T;
+}): ResourcePermission<T>;
 export function createPermission(input: {
   name: string;
   attributes: PermissionAttributes;
