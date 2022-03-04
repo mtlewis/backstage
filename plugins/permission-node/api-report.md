@@ -12,6 +12,8 @@ import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import { BackstageIdentityResponse } from '@backstage/plugin-auth-node';
 import { Config } from '@backstage/config';
 import express from 'express';
+import { FetchConditionalDecisionQuery } from '@backstage/plugin-permission-common';
+import { FetchConditionalDecisionResult } from '@backstage/plugin-permission-common';
 import { Identified } from '@backstage/plugin-permission-common';
 import { NotCriteria } from '@backstage/plugin-permission-common';
 import { PermissionAuthorizer } from '@backstage/plugin-permission-common';
@@ -71,11 +73,12 @@ export type ConditionTransformer<TQuery> = (
 
 // @public
 export const createConditionExports: <
+  TResourceType extends string,
   TResource,
   TRules extends Record<string, PermissionRule<TResource, any, unknown[]>>,
 >(options: {
   pluginId: string;
-  resourceType: string;
+  resourceType: TResourceType;
   rules: TRules;
 }) => {
   conditions: Conditions<TRules>;
@@ -179,6 +182,11 @@ export class ServerPermissionClient implements PermissionAuthorizer {
     queries: AuthorizeQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<AuthorizeDecision[]>;
+  // (undocumented)
+  fetchConditionalDecision(
+    queries: FetchConditionalDecisionQuery[],
+    options?: AuthorizeRequestOptions,
+  ): Promise<FetchConditionalDecisionResult[]>;
   // (undocumented)
   static fromConfig(
     config: Config,

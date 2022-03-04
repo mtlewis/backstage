@@ -28,7 +28,7 @@ import {
   PermissionCriteria,
   PermissionCondition,
   AuthorizeQuery,
-  BatchRequest,
+  Batch,
 } from './types/api';
 import { DiscoveryApi } from './types/discovery';
 import {
@@ -78,7 +78,7 @@ const fetchConditionalDecisionResultSchema: z.ZodSchema<FetchConditionalDecision
 const responseSchema = <T>(
   itemSchema: z.ZodSchema<T>,
   ids: Set<string>,
-): z.ZodSchema<BatchRequest<T>> =>
+): z.ZodSchema<Batch<T>> =>
   z.object({
     items: z
       .array(
@@ -163,16 +163,16 @@ export class PermissionClient implements PermissionAuthorizer {
     );
   }
 
-  private async makeAuthorizeRequest<T>(
-    queries: AuthorizeQuery[] | FetchConditionalDecisionQuery[],
-    itemSchema: z.ZodSchema<T>,
+  private async makeAuthorizeRequest<TQuery, TResult>(
+    queries: TQuery[],
+    itemSchema: z.ZodSchema<TResult>,
     options?: AuthorizeRequestOptions,
   ) {
     if (!this.enabled) {
       return queries.map(_ => ({ result: AuthorizeResult.ALLOW as const }));
     }
 
-    const request = {
+    const request: Batch<Identified<TQuery>> = {
       items: queries.map(query => ({
         id: uuid.v4(),
         ...query,
@@ -202,7 +202,7 @@ export class PermissionClient implements PermissionAuthorizer {
     const responsesById = parsedResponse.items.reduce((acc, r) => {
       acc[r.id] = r;
       return acc;
-    }, {} as Record<string, Identified<T>>);
+    }, {} as Record<string, Identified<TResult>>);
 
     return request.items.map(query => responsesById[query.id]);
   }

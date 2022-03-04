@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
-import { AuthorizeResult } from '@backstage/plugin-permission-common';
+import {
+  AuthorizeResult,
+  createPermission,
+} from '@backstage/plugin-permission-common';
 import { MockPermissionApi } from './MockPermissionApi';
 
 describe('MockPermissionApi', () => {
@@ -22,7 +25,9 @@ describe('MockPermissionApi', () => {
     const api = new MockPermissionApi();
 
     await expect(
-      api.authorize({ permission: { name: 'permission.1', attributes: {} } }),
+      api.authorize({
+        permission: createPermission({ name: 'permission.1', attributes: {} }),
+      }),
     ).resolves.toEqual({ result: AuthorizeResult.ALLOW });
   });
 
@@ -34,7 +39,9 @@ describe('MockPermissionApi', () => {
     );
 
     await expect(
-      api.authorize({ permission: { name: 'permission.2', attributes: {} } }),
+      api.authorize({
+        permission: createPermission({ name: 'permission.2', attributes: {} }),
+      }),
     ).resolves.toEqual({ result: AuthorizeResult.DENY });
   });
 });

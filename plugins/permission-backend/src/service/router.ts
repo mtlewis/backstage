@@ -18,6 +18,7 @@ import { z } from 'zod';
 import express, { Request, Response } from 'express';
 import Router from 'express-promise-router';
 import { Logger } from 'winston';
+import { omit } from 'lodash';
 import {
   errorHandler,
   PluginEndpointDiscovery,
@@ -30,16 +31,15 @@ import {
 } from '@backstage/plugin-auth-node';
 import {
   AuthorizeResult,
-  AuthorizeDecision,
-  AuthorizeQuery,
   Identified,
-  AuthorizeRequest,
-  AuthorizeResponse,
   isResourcePermission,
   PermissionAttributes,
   Permission,
   ResourcePermission,
   BasicPermission,
+  Batch,
+  PermissionCriteria,
+  PermissionCondition,
 } from '@backstage/plugin-permission-common';
 import {
   ApplyConditionsRequestEntry,
@@ -50,6 +50,25 @@ import { PermissionIntegrationClient } from './PermissionIntegrationClient';
 import { memoize } from 'lodash';
 import DataLoader from 'dataloader';
 import { Config } from '@backstage/config';
+
+type AuthorizeApiRequest =
+  | {
+      permission: ResourcePermission;
+      resourceRef?: string;
+    }
+  | {
+      permission: Exclude<Permission, ResourcePermission>;
+      resourceRef?: never;
+    };
+
+type AuthorizeApiResponse =
+  | {
+      result: AuthorizeResult.ALLOW | AuthorizeResult.DENY;
+    }
+  | {
+      result: AuthorizeResult.CONDITIONAL;
+      conditions: PermissionCriteria<PermissionCondition>;
+    };
 
 const attributesSchema: z.ZodSchema<PermissionAttributes> = z.object({
   action: z
@@ -75,27 +94,23 @@ const resourcePermissionSchema: z.ZodSchema<ResourcePermission> = z.object({
   resourceType: z.string(),
 });
 
-const permissionSchema: z.ZodSchema<Permission> = z.union([
-  basicPermissionSchema,
-  resourcePermissionSchema,
-]);
-
-const querySchema: z.ZodSchema<Identified<AuthorizeQuery>> = z.union([
-  z.object({
-    id: z.string(),
-    permission: permissionSchema,
-    resourceRef: z.never().optional(),
-  }),
+const querySchema: z.ZodSchema<Identified<AuthorizeApiRequest>> = z.union([
   z.object({
     id: z.string(),
     permission: resourcePermissionSchema,
-    resourceRef: z.string(),
+    resourceRef: z.string().optional(),
+  }),
+  z.object({
+    id: z.string(),
+    permission: basicPermissionSchema,
+    resourceRef: z.never().optional(),
   }),
 ]);
 
-const requestSchema: z.ZodSchema<AuthorizeRequest> = z.object({
-  items: z.array(querySchema),
-});
+const requestSchema: z.ZodSchema<Batch<Identified<AuthorizeApiRequest>>> =
+  z.object({
+    items: z.array(querySchema),
+  });
 
 /**
  * Options required when constructing a new {@link express#Router} using
@@ -112,12 +127,12 @@ export interface RouterOptions {
 }
 
 const handleRequest = async (
-  requests: Identified<AuthorizeQuery>[],
+  requests: Identified<AuthorizeApiRequest>[],
   user: BackstageIdentityResponse | undefined,
   policy: PermissionPolicy,
   permissionIntegrationClient: PermissionIntegrationClient,
   authHeader?: string,
-): Promise<Identified<AuthorizeDecision>[]> => {
+): Promise<Identified<AuthorizeApiResponse>[]> => {
   const applyConditionsLoaderFor = memoize((pluginId: string) => {
     return new DataLoader<
       ApplyConditionsRequestEntry,
@@ -128,8 +143,8 @@ const handleRequest = async (
   });
 
   return Promise.all(
-    requests.map(({ id, resourceRef, ...request }) =>
-      policy.handle(request, user).then(decision => {
+    requests.map(({ id, ...request }) =>
+      policy.handle(omit(request, 'resourceRef'), user).then(decision => {
         if (decision.result !== AuthorizeResult.CONDITIONAL) {
           return {
             id,
@@ -149,7 +164,7 @@ const handleRequest = async (
           );
         }
 
-        if (!resourceRef) {
+        if (!request.resourceRef) {
           return {
             id,
             ...decision,
@@ -158,7 +173,7 @@ const handleRequest = async (
 
         return applyConditionsLoaderFor(decision.pluginId).load({
           id,
-          resourceRef,
+          resourceRef: request.resourceRef,
           ...decision,
         });
       }),
@@ -197,8 +212,8 @@ export async function createRouter(
   router.post(
     '/authorize',
     async (
-      req: Request<AuthorizeRequest>,
-      res: Response<AuthorizeResponse>,
+      req: Request<Batch<Identified<AuthorizeApiRequest>>>,
+      res: Response<Batch<Identified<AuthorizeApiResponse>>>,
     ) => {
       const token = getBearerTokenFromAuthorizationHeader(
         req.header('authorization'),

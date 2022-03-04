@@ -18,10 +18,10 @@ import { IconButton } from '@material-ui/core';
 import { LinkProps } from '@backstage/core-components';
 import { Observable } from '@backstage/types';
 import { Overrides } from '@material-ui/core/styles/overrides';
-import { Permission } from '@backstage/plugin-permission-common';
 import { PropsWithChildren } from 'react';
 import { default as React_2 } from 'react';
 import { ReactNode } from 'react';
+import { ResourcePermission } from '@backstage/plugin-permission-common';
 import { RouteRef } from '@backstage/core-plugin-api';
 import { ScmIntegrationRegistry } from '@backstage/integration';
 import { StyleRules } from '@material-ui/core/styles/withStyles';
@@ -531,7 +531,7 @@ export function useEntityOwnership(): {
 };
 
 // @alpha
-export function useEntityPermission(permission: Permission): {
+export function useEntityPermission(permission: ResourcePermission): {
   loading: boolean;
   allowed: boolean;
   error?: Error;

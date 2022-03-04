@@ -16,34 +16,24 @@ export type AnyOfCriteria<TQuery> = {
 };
 
 // @public
-export type AuthorizeDecision =
+export type AuthorizeDecision = {
+  result: AuthorizeResult.ALLOW | AuthorizeResult.DENY;
+};
+
+// @public
+export type AuthorizeQuery =
   | {
-      result: AuthorizeResult.ALLOW | AuthorizeResult.DENY;
+      permission: Exclude<Permission, ResourcePermission>;
+      resourceRef?: never;
     }
   | {
-      result: AuthorizeResult.CONDITIONAL;
-      conditions: PermissionCriteria<PermissionCondition>;
+      permission: ResourcePermission;
+      resourceRef: string;
     };
-
-// @public
-export type AuthorizeQuery = {
-  permission: Permission;
-  resourceRef?: string;
-};
-
-// @public
-export type AuthorizeRequest = {
-  items: Identified<AuthorizeQuery>[];
-};
 
 // @public
 export type AuthorizeRequestOptions = {
   token?: string;
-};
-
-// @public
-export type AuthorizeResponse = {
-  items: Identified<AuthorizeDecision>[];
 };
 
 // @public
@@ -55,6 +45,11 @@ export enum AuthorizeResult {
 
 // @public
 export type BasicPermission = PermissionBase<'basic', {}>;
+
+// @public
+export type Batch<T> = {
+  items: Identified<T>[];
+};
 
 // @public
 export function createPermission<T extends string>(input: {
@@ -73,6 +68,22 @@ export function createPermission(input: {
 export type DiscoveryApi = {
   getBaseUrl(pluginId: string): Promise<string>;
 };
+
+// @public
+export type FetchConditionalDecisionQuery = {
+  permission: ResourcePermission;
+  resourceRef?: never;
+};
+
+// @public
+export type FetchConditionalDecisionResult =
+  | {
+      result: AuthorizeResult.ALLOW | AuthorizeResult.DENY;
+    }
+  | {
+      result: AuthorizeResult.CONDITIONAL;
+      conditions: PermissionCriteria<PermissionCondition>;
+    };
 
 // @public
 export type Identified<T> = T & {
@@ -117,6 +128,11 @@ export interface PermissionAuthorizer {
     queries: AuthorizeQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<AuthorizeDecision[]>;
+  // (undocumented)
+  fetchConditionalDecision(
+    queries: FetchConditionalDecisionQuery[],
+    options?: AuthorizeRequestOptions,
+  ): Promise<FetchConditionalDecisionResult[]>;
 }
 
 // @public
@@ -134,6 +150,10 @@ export class PermissionClient implements PermissionAuthorizer {
     queries: AuthorizeQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<AuthorizeDecision[]>;
+  fetchConditionalDecision(
+    queries: FetchConditionalDecisionQuery[],
+    options?: AuthorizeRequestOptions,
+  ): Promise<FetchConditionalDecisionResult[]>;
 }
 
 // @public

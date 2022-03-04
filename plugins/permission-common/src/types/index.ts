@@ -18,7 +18,7 @@ export { AuthorizeResult } from './api';
 export type {
   AuthorizeQuery,
   AuthorizeDecision,
-  BatchRequest,
+  Batch,
   FetchConditionalDecisionQuery,
   FetchConditionalDecisionResult,
   Identified,

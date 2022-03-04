@@ -15,8 +15,8 @@
  */
 
 import {
-  DefinitiveAuthorizeDecision,
-  DefinitiveAuthorizeQuery,
+  AuthorizeDecision,
+  AuthorizeQuery,
 } from '@backstage/plugin-permission-common';
 import { ApiRef, createApiRef } from '@backstage/core-plugin-api';
 
@@ -27,9 +27,7 @@ import { ApiRef, createApiRef } from '@backstage/core-plugin-api';
  * @public
  */
 export type PermissionApi = {
-  authorize(
-    request: DefinitiveAuthorizeQuery,
-  ): Promise<DefinitiveAuthorizeDecision>;
+  authorize(request: AuthorizeQuery): Promise<AuthorizeDecision>;
 };
 
 /**

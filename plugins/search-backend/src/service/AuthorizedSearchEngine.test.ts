@@ -16,10 +16,9 @@
 
 import { ConfigReader } from '@backstage/config';
 import {
-  AuthorizeDecision,
   AuthorizeResult,
-  ConditionalAuthorizeDecision,
   createPermission,
+  FetchConditionalDecisionResult,
   PermissionAuthorizer,
 } from '@backstage/plugin-permission-common';
 import {
@@ -286,7 +285,7 @@ describe('AuthorizedSearchEngine', () => {
         _ =>
           ({
             result: AuthorizeResult.CONDITIONAL,
-          } as ConditionalAuthorizeDecision),
+          } as FetchConditionalDecisionResult),
       ),
     );
 
@@ -329,7 +328,10 @@ describe('AuthorizedSearchEngine', () => {
   it('should perform search until the target number of results is reached', async () => {
     mockedFetchConditionalDecision.mockImplementation(async queries =>
       queries.map(
-        _ => ({ result: AuthorizeResult.CONDITIONAL } as AuthorizeDecision),
+        _ =>
+          ({
+            result: AuthorizeResult.CONDITIONAL,
+          } as FetchConditionalDecisionResult),
       ),
     );
 
@@ -407,7 +409,7 @@ describe('AuthorizedSearchEngine', () => {
         _ =>
           ({
             result: AuthorizeResult.CONDITIONAL,
-          } as ConditionalAuthorizeDecision),
+          } as FetchConditionalDecisionResult),
       ),
     );
 
@@ -498,7 +500,7 @@ describe('AuthorizedSearchEngine', () => {
         _ =>
           ({
             result: AuthorizeResult.CONDITIONAL,
-          } as ConditionalAuthorizeDecision),
+          } as FetchConditionalDecisionResult),
       ),
     );
 

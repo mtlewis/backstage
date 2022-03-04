@@ -24,10 +24,10 @@ import { Permission, ResourcePermission } from './permission';
 export type Identified<T> = T & { id: string };
 
 /**
- * A batch of requests from {@link PermissionClient} methods.
+ * A batch of request or response items used in {@link PermissionClient} methods.
  * @public
  */
-export type BatchRequest<T> = {
+export type Batch<T> = {
   items: Identified<T>[];
 };
 
