@@ -16,9 +16,9 @@
 
 import {
   AuthorizeDecision,
-  DefinitiveAuthorizeDecision,
-  ConditionalAuthorizeQuery,
-  DefinitiveAuthorizeQuery,
+  AuthorizeQuery,
+  FetchConditionalDecisionQuery,
+  FetchConditionalDecisionResult,
 } from './api';
 
 /**
@@ -91,14 +91,14 @@ export type ResourcePermission<TResourceType extends string = string> =
  */
 export interface PermissionAuthorizer {
   authorize(
-    queries: DefinitiveAuthorizeQuery[],
-    options?: AuthorizeRequestOptions,
-  ): Promise<DefinitiveAuthorizeDecision[]>;
-
-  fetchConditionalDecision(
-    queries: ConditionalAuthorizeQuery[],
+    queries: AuthorizeQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<AuthorizeDecision[]>;
+
+  fetchConditionalDecision(
+    queries: FetchConditionalDecisionQuery[],
+    options?: AuthorizeRequestOptions,
+  ): Promise<FetchConditionalDecisionResult[]>;
 }
 
 /**

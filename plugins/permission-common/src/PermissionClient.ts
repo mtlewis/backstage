@@ -22,12 +22,13 @@ import { z } from 'zod';
 import {
   AuthorizeResult,
   AuthorizeDecision,
+  FetchConditionalDecisionQuery,
+  FetchConditionalDecisionResult,
   Identified,
   PermissionCriteria,
   PermissionCondition,
-  DefinitiveAuthorizeDecision,
-  DefinitiveAuthorizeQuery,
-  ConditionalAuthorizeQuery,
+  AuthorizeQuery,
+  BatchRequest,
 } from './types/api';
 import { DiscoveryApi } from './types/discovery';
 import {
@@ -57,21 +58,27 @@ const permissionCriteriaSchema: z.ZodSchema<
     .or(z.object({ not: permissionCriteriaSchema }).strict()),
 );
 
-const definitiveDecisionSchema = z.object({
+const authorizeDecisionSchema: z.ZodSchema<AuthorizeDecision> = z.object({
   result: z.literal(AuthorizeResult.ALLOW).or(z.literal(AuthorizeResult.DENY)),
 });
 
-const conditionalDecisionSchema = z.object({
-  result: z.literal(AuthorizeResult.CONDITIONAL),
-  conditions: permissionCriteriaSchema,
-});
+const fetchConditionalDecisionResultSchema: z.ZodSchema<FetchConditionalDecisionResult> =
+  z.union([
+    z.object({
+      result: z
+        .literal(AuthorizeResult.ALLOW)
+        .or(z.literal(AuthorizeResult.DENY)),
+    }),
+    z.object({
+      result: z.literal(AuthorizeResult.CONDITIONAL),
+      conditions: permissionCriteriaSchema,
+    }),
+  ]);
 
-const decisionSchema = z.union([
-  definitiveDecisionSchema,
-  conditionalDecisionSchema,
-]);
-
-const responseSchema = <T>(itemSchema: z.ZodSchema<T>, ids: Set<string>) =>
+const responseSchema = <T>(
+  itemSchema: z.ZodSchema<T>,
+  ids: Set<string>,
+): z.ZodSchema<BatchRequest<T>> =>
   z.object({
     items: z
       .array(
@@ -106,42 +113,58 @@ export class PermissionClient implements PermissionAuthorizer {
   }
 
   /**
-   * Request authorization from the permission-backend for the given set of permissions.
+   * Request authorization from the permission-backend for the given set of
+   * permissions.
    *
-   * Authorization requests check that a given Backstage user can perform a protected operation,
-   * potentially for a specific resource (such as a catalog entity). The Backstage identity token
-   * should be included in the `options` if available.
+   * @remarks
    *
-   * Permissions can be imported from plugins exposing them, such as `catalogEntityReadPermission`.
+   * Checks that a given Backstage user can perform a protected operation. When
+   * authorization is for a {@link ResourcePermission}s, a resourceRef
+   * corresponding to the resource should always be supplied along with the
+   * permission. The Backstage identity token should be included in the
+   * `options` if available.
    *
-   * The response will be either ALLOW or DENY when either the permission has no resourceType, or a
-   * resourceRef is provided in the request. For permissions with a resourceType, CONDITIONAL may be
-   * returned if no resourceRef is provided in the request. Conditional responses are intended only
-   * for backends which have access to the data source for permissioned resources, so that filters
-   * can be applied when loading collections of resources.
+   * Permissions can be imported from plugins exposing them, such as
+   * `catalogEntityReadPermission`.
+   *
+   * For each query, the response will be either ALLOW or DENY.
    *
    * @public
    */
   async authorize(
-    queries: DefinitiveAuthorizeQuery[],
+    queries: AuthorizeQuery[],
     options?: AuthorizeRequestOptions,
-  ): Promise<DefinitiveAuthorizeDecision[]> {
+  ): Promise<AuthorizeDecision[]> {
+    return this.makeAuthorizeRequest(queries, authorizeDecisionSchema, options);
+  }
+
+  /**
+   * Fetch the conditional authorization decisions for the given set of
+   * {@link ResourcePermission}s in order to apply the conditions to an upstream
+   * data source.
+   *
+   * @remarks
+   *
+   * For each query, the response will be either ALLOW, DENY, or CONDITIONAL.
+   * Conditional responses are intended only for backends which have access to
+   * the data source for permissioned resources, so that filters can be applied
+   * when loading collections of resources.
+   *
+   * @public
+   */
+  async fetchConditionalDecision(
+    queries: FetchConditionalDecisionQuery[],
+    options?: AuthorizeRequestOptions,
+  ): Promise<FetchConditionalDecisionResult[]> {
     return this.makeAuthorizeRequest(
       queries,
-      definitiveDecisionSchema,
+      fetchConditionalDecisionResultSchema,
       options,
     );
   }
 
-  async fetchConditionalDecision(
-    queries: ConditionalAuthorizeQuery[],
-    options?: AuthorizeRequestOptions,
-  ): Promise<AuthorizeDecision[]> {
-    return this.makeAuthorizeRequest(queries, decisionSchema, options);
-  }
-
   private async makeAuthorizeRequest<T>(
-    queries: ConditionalAuthorizeQuery[] | DefinitiveAuthorizeQuery[],
+    queries: AuthorizeQuery[] | FetchConditionalDecisionQuery[],
     itemSchema: z.ZodSchema<T>,
     options?: AuthorizeRequestOptions,
   ) {

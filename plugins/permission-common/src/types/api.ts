@@ -24,6 +24,14 @@ import { Permission, ResourcePermission } from './permission';
 export type Identified<T> = T & { id: string };
 
 /**
+ * A batch of requests from {@link PermissionClient} methods.
+ * @public
+ */
+export type BatchRequest<T> = {
+  items: Identified<T>[];
+};
+
+/**
  * The result of an authorization request.
  * @public
  */
@@ -42,7 +50,11 @@ export enum AuthorizeResult {
   CONDITIONAL = 'CONDITIONAL',
 }
 
-export type DefinitiveAuthorizeQuery =
+/**
+ * An individual request for {@link PermissionClient#authorize}.
+ * @public
+ */
+export type AuthorizeQuery =
   | {
       permission: Exclude<Permission, ResourcePermission>;
       // Prohibit resourceRefs for non-resource permissions to
@@ -52,28 +64,11 @@ export type DefinitiveAuthorizeQuery =
   | { permission: ResourcePermission; resourceRef: string };
 
 /**
- * An individual request to fetch authorization conditions via {@link PermissionClient#fetchConditionalDecision}.
+ * An individual response from {@link PermissionClient#authorize}.
  * @public
  */
-export type ConditionalAuthorizeQuery = {
-  permission: ResourcePermission;
-  resourceRef?: never;
-};
-
-/**
- * An individual authorization request for {@link PermissionClient#authorize}.
- * @public
- */
-export type AuthorizeQuery =
-  | DefinitiveAuthorizeQuery
-  | ConditionalAuthorizeQuery;
-
-/**
- * A batch of authorization requests from {@link PermissionClient#authorize}.
- * @public
- */
-export type AuthorizeRequest = {
-  items: Identified<AuthorizeQuery>[];
+export type AuthorizeDecision = {
+  result: AuthorizeResult.ALLOW | AuthorizeResult.DENY;
 };
 
 /**
@@ -130,34 +125,21 @@ export type PermissionCriteria<TQuery> =
   | TQuery;
 
 /**
- *
+ * An individual request for {@link PermissionClient#fetchConditionalDecision}.
  * @public
  */
-export type DefinitiveAuthorizeDecision = {
-  result: AuthorizeResult.ALLOW | AuthorizeResult.DENY;
+export type FetchConditionalDecisionQuery = {
+  permission: ResourcePermission;
+  resourceRef?: never;
 };
 
 /**
- *
+ * An individual response for {@link PermissionClient#fetchConditionalDecision}.
  * @public
  */
-export type ConditionalAuthorizeDecision = {
-  result: AuthorizeResult.CONDITIONAL;
-  conditions: PermissionCriteria<PermissionCondition>;
-};
-
-/**
- * An individual authorization response from {@link PermissionClient#authorize}.
- * @public
- */
-export type AuthorizeDecision =
-  | DefinitiveAuthorizeDecision
-  | ConditionalAuthorizeDecision;
-
-/**
- * A batch of authorization responses from {@link PermissionClient#authorize}.
- * @public
- */
-export type AuthorizeResponse = {
-  items: Identified<AuthorizeDecision>[];
-};
+export type FetchConditionalDecisionResult =
+  | { result: AuthorizeResult.ALLOW | AuthorizeResult.DENY }
+  | {
+      result: AuthorizeResult.CONDITIONAL;
+      conditions: PermissionCriteria<PermissionCondition>;
+    };

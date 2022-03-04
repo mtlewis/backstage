@@ -17,13 +17,10 @@
 export { AuthorizeResult } from './api';
 export type {
   AuthorizeQuery,
-  AuthorizeRequest,
   AuthorizeDecision,
-  AuthorizeResponse,
-  ConditionalAuthorizeDecision,
-  ConditionalAuthorizeQuery,
-  DefinitiveAuthorizeDecision,
-  DefinitiveAuthorizeQuery,
+  BatchRequest,
+  FetchConditionalDecisionQuery,
+  FetchConditionalDecisionResult,
   Identified,
   PermissionCondition,
   PermissionCriteria,

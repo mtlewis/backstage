@@ -23,11 +23,11 @@ import {
   AuthorizeRequestOptions,
   AuthorizeDecision,
   AuthorizeResult,
-  DefinitiveAuthorizeDecision,
   PermissionClient,
   PermissionAuthorizer,
-  ConditionalAuthorizeQuery,
-  DefinitiveAuthorizeQuery,
+  AuthorizeQuery,
+  FetchConditionalDecisionQuery,
+  FetchConditionalDecisionResult,
 } from '@backstage/plugin-permission-common';
 
 /**
@@ -80,18 +80,18 @@ export class ServerPermissionClient implements PermissionAuthorizer {
   }
 
   async authorize(
-    queries: DefinitiveAuthorizeQuery[],
+    queries: AuthorizeQuery[],
     options?: AuthorizeRequestOptions,
-  ): Promise<DefinitiveAuthorizeDecision[]> {
+  ): Promise<AuthorizeDecision[]> {
     return (await this.isEnabled(options?.token))
       ? this.permissionClient.authorize(queries, options)
       : queries.map(_ => ({ result: AuthorizeResult.ALLOW }));
   }
 
   async fetchConditionalDecision(
-    queries: ConditionalAuthorizeQuery[],
+    queries: FetchConditionalDecisionQuery[],
     options?: AuthorizeRequestOptions,
-  ): Promise<AuthorizeDecision[]> {
+  ): Promise<FetchConditionalDecisionResult[]> {
     return (await this.isEnabled(options?.token))
       ? this.permissionClient.fetchConditionalDecision(queries, options)
       : queries.map(_ => ({ result: AuthorizeResult.ALLOW }));
