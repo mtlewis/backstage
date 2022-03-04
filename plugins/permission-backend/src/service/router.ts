@@ -37,6 +37,9 @@ import {
   AuthorizeResponse,
   isResourcePermission,
   PermissionAttributes,
+  Permission,
+  ResourcePermission,
+  BasicPermission,
 } from '@backstage/plugin-permission-common';
 import {
   ApplyConditionsRequestEntry,
@@ -59,25 +62,36 @@ const attributesSchema: z.ZodSchema<PermissionAttributes> = z.object({
     .optional(),
 });
 
-const permissionSchema = z.union([
-  z.object({
-    type: z.literal('basic'),
-    name: z.string(),
-    attributes: attributesSchema,
-  }),
-  z.object({
-    type: z.literal('resource'),
-    name: z.string(),
-    attributes: attributesSchema,
-    resourceType: z.string(),
-  }),
+const basicPermissionSchema: z.ZodSchema<BasicPermission> = z.object({
+  type: z.literal('basic'),
+  name: z.string(),
+  attributes: attributesSchema,
+});
+
+const resourcePermissionSchema: z.ZodSchema<ResourcePermission> = z.object({
+  type: z.literal('resource'),
+  name: z.string(),
+  attributes: attributesSchema,
+  resourceType: z.string(),
+});
+
+const permissionSchema: z.ZodSchema<Permission> = z.union([
+  basicPermissionSchema,
+  resourcePermissionSchema,
 ]);
 
-const querySchema: z.ZodSchema<Identified<AuthorizeQuery>> = z.object({
-  id: z.string(),
-  resourceRef: z.string().optional(),
-  permission: permissionSchema,
-});
+const querySchema: z.ZodSchema<Identified<AuthorizeQuery>> = z.union([
+  z.object({
+    id: z.string(),
+    permission: permissionSchema,
+    resourceRef: z.never().optional(),
+  }),
+  z.object({
+    id: z.string(),
+    permission: resourcePermissionSchema,
+    resourceRef: z.string(),
+  }),
+]);
 
 const requestSchema: z.ZodSchema<AuthorizeRequest> = z.object({
   items: z.array(querySchema),

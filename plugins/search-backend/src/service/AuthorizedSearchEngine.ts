@@ -21,6 +21,9 @@ import {
   AuthorizeDecision,
   AuthorizeQuery,
   AuthorizeResult,
+  ConditionalAuthorizeQuery,
+  DefinitiveAuthorizeQuery,
+  isResourcePermission,
   PermissionAuthorizer,
 } from '@backstage/plugin-permission-common';
 import {
@@ -88,8 +91,16 @@ export class AuthorizedSearchEngine implements SearchEngine {
   ): Promise<SearchResultSet> {
     const queryStartTime = Date.now();
 
+    const conditionFetcher = new DataLoader(
+      (requests: readonly ConditionalAuthorizeQuery[]) =>
+        this.permissions.fetchConditionalDecision(requests.slice(), options),
+      {
+        cacheKeyFn: ({ permission: { name } }) => name,
+      },
+    );
+
     const authorizer = new DataLoader(
-      (requests: readonly AuthorizeQuery[]) =>
+      (requests: readonly DefinitiveAuthorizeQuery[]) =>
         this.permissions.authorize(requests.slice(), options),
       {
         // Serialize the permission name and resourceRef as
@@ -99,6 +110,7 @@ export class AuthorizedSearchEngine implements SearchEngine {
           qs.stringify({ name, resourceRef }),
       },
     );
+
     const requestedTypes = query.types || Object.keys(this.types);
 
     const typeDecisions = zipObject(
@@ -107,9 +119,18 @@ export class AuthorizedSearchEngine implements SearchEngine {
         requestedTypes.map(type => {
           const permission = this.types[type]?.visibilityPermission;
 
-          return permission
-            ? authorizer.load({ permission })
-            : { result: AuthorizeResult.ALLOW as const };
+          // No permission configured for this document type - always allow.
+          if (!permission) {
+            return { result: AuthorizeResult.ALLOW as const };
+          }
+
+          // Resource permission supplied, so we need to check for conditional decisions.
+          if (isResourcePermission(permission)) {
+            return conditionFetcher.load({ permission });
+          }
+
+          // Non-resource permission supplied - we can perform a standard authorization.
+          return authorizer.load({ permission });
         }),
       ),
     );
@@ -197,7 +218,11 @@ export class AuthorizedSearchEngine implements SearchEngine {
           const permission = this.types[result.type]?.visibilityPermission;
           const resourceRef = result.document.authorization?.resourceRef;
 
-          if (!permission || !resourceRef) {
+          if (
+            !permission ||
+            !isResourcePermission(permission) ||
+            !resourceRef
+          ) {
             return result;
           }
 

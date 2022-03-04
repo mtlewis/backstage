@@ -67,11 +67,12 @@ export type Conditions<
  * @public
  */
 export const createConditionExports = <
+  TResourceType extends string,
   TResource,
   TRules extends Record<string, PermissionRule<TResource, any>>,
 >(options: {
   pluginId: string;
-  resourceType: string;
+  resourceType: TResourceType;
   rules: TRules;
 }): {
   conditions: Conditions<TRules>;

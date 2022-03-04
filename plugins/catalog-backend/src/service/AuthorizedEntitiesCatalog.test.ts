@@ -34,6 +34,7 @@ describe('AuthorizedEntitiesCatalog', () => {
   };
   const fakePermissionApi = {
     authorize: jest.fn(),
+    fetchConditionalDecision: jest.fn(),
   };
 
   const createCatalog = (

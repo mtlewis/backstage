@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
-import { AuthorizeQuery, AuthorizeDecision } from './api';
+import {
+  AuthorizeDecision,
+  DefinitiveAuthorizeDecision,
+  ConditionalAuthorizeQuery,
+  DefinitiveAuthorizeQuery,
+} from './api';
 
 /**
  * The attributes related to a given permission; these should be generic and widely applicable to
@@ -86,7 +91,12 @@ export type ResourcePermission<TResourceType extends string = string> =
  */
 export interface PermissionAuthorizer {
   authorize(
-    queries: AuthorizeQuery[],
+    queries: DefinitiveAuthorizeQuery[],
+    options?: AuthorizeRequestOptions,
+  ): Promise<DefinitiveAuthorizeDecision[]>;
+
+  fetchConditionalDecision(
+    queries: ConditionalAuthorizeQuery[],
     options?: AuthorizeRequestOptions,
   ): Promise<AuthorizeDecision[]>;
 }
