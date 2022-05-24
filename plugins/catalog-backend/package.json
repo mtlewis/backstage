@@ -48,7 +48,7 @@
     "fast-json-stable-stringify": "^2.1.0",
     "fs-extra": "9.1.0",
     "git-url-parse": "~11.4.4",
-    "glob": "^7.1.6",
+    "glob": "^8.0.3",
     "knex": "^0.95.1",
     "lodash": "^4.17.15",
     "luxon": "^2.0.2",
